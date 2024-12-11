@@ -8,6 +8,8 @@ import Register from './pages/Register';
 import PlaceAppointment from './pages/PlaceAppointment';
 import AdminDashboard from './pages/AdminDashboard';
 import PrivateRoute from './components/PrivateRoute';
+import './App.css';
+import 'bootstrap/dist/css/bootstrap.min.css';
 
 const App = () => {
   return (
