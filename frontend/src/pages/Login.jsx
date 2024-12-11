@@ -14,6 +14,7 @@ const Login = () => {
         data: { email, password },
       });
       localStorage.setItem('token', response.data.token);
+      localStorage.setItem('userID', response.data.user_id); // Ensure this matches the response key
       window.location.href = '/appointments';
     } catch (error) {
       console.error('Login failed:', error.response.data.message);

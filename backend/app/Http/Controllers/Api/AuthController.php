@@ -21,19 +21,18 @@ class AuthController extends Controller
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
-                'message' => 'The provide credentils are incorrect'
+                'message' => 'The provided credentials are incorrect'
             ], 401);
         }
-
+        
         $token = $user->createToken($user->name.'Auth-Token')->plainTextToken;
-
         return response()->json([
-            'message'=> 'Login Successfull',
+            'message'=> 'Login Successful',
             'token_type'=> 'Bearer',
-            'token'=> $token
+            'token'=> $token,
+            'user_id' => $user->id
         ],200);
     }
-
 
     public function register(Request $request): JsonResponse {
         $request->validate([
@@ -52,9 +51,10 @@ class AuthController extends Controller
             $token = $user->createToken($user->name.'Auth-Token')->plainTextToken;
 
             return response()->json([
-                'message'=> 'Registration Successfull',
+                'message'=> 'Registration Successful',
                 'token_type'=> 'Bearer',
-                'token'=> $token
+                'token'=> $token,
+                'user_id' => $user->id
             ],201);
         } else {
             return response()->json([
@@ -84,11 +84,11 @@ class AuthController extends Controller
             $user->tokens()->delete();
 
             return response()->json([
-                'message'=> 'Logout Successfull'
+                'message'=> 'Logout Successful'
             ],200);
         } else {
             return response()->json([
-                'message'=> 'user not found'
+                'message'=> 'User not found'
             ],404);            
         }
     }
