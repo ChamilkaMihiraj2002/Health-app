@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { axiosInstance } from '../axiosInstance'; // Adjust the import path as needed
+import 'bootstrap/dist/css/bootstrap.min.css';
 
 const AppointmentPlacement = () => {
-  // State for form inputs
   const [formData, setFormData] = useState({
     Location: '',
     Date: '',
@@ -12,21 +12,25 @@ const AppointmentPlacement = () => {
     userID: localStorage.getItem('userID') || ''
   });
 
-  // State for user's appointments
   const [appointments, setAppointments] = useState([]);
-
-  // State for form validation and submission
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [fetchError, setFetchError] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
-  // Fetch user's appointments on component mount
+  const [profileData, setProfileData] = useState({});
+  const [profileUpdateData, setProfileUpdateData] = useState({});
+  const [profileError, setProfileError] = useState(null);
+
   useEffect(() => {
     fetchAppointments();
+    fetchUserProfile();
   }, []);
 
-  // Fetch appointments
   const fetchAppointments = async () => {
     setIsLoading(true);
     setFetchError(null);
@@ -43,37 +47,86 @@ const AppointmentPlacement = () => {
         }
       });
 
-      // Defensive programming to handle different possible response structures
-      const appointmentsData = response.data?.data || 
-                                response.data?.appointments || 
-                                response.data || 
-                                [];
-
-      // Ensure we always have an array
+      const appointmentsData = response.data?.data || response.data?.appointments || response.data || [];
       setAppointments(Array.isArray(appointmentsData) ? appointmentsData : []);
     } catch (error) {
       console.error('Error fetching appointments:', error);
-      
-      // More detailed error handling
       if (error.response) {
-        // The request was made and the server responded with a status code
-        // that falls out of the range of 2xx
         setFetchError(error.response.data.message || 'Failed to fetch appointments');
       } else if (error.request) {
-        // The request was made but no response was received
         setFetchError('No response received from server');
       } else {
-        // Something happened in setting up the request that triggered an Error
         setFetchError('Error setting up the request');
       }
-      
       setAppointments([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Handle input changes
+  // Fetch User Profile
+  const fetchUserProfile = async () => {
+    setProfileError(null);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No authentication token found');
+
+      const response = await axiosInstance.get('/profile', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      setProfileData(response.data || {});
+      setProfileUpdateData(response.data || {});
+    } catch (error) {
+      setProfileError(error.response?.data?.message || 'Failed to fetch profile data');
+    }
+  };
+
+  // Handle Logout
+  const handleLogout = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No authentication token found');
+
+      await axiosInstance.post('/logout', {}, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      localStorage.removeItem('token');
+      localStorage.removeItem('userID');
+      alert('Logged out successfully!');
+      window.location.reload(); // Refresh or redirect to login
+    } catch (error) {
+      console.error('Logout failed:', error);
+      alert('Failed to logout');
+    }
+  };
+
+  // Handle Profile Update Input Change
+  const handleProfileInputChange = (e) => {
+    const { name, value } = e.target;
+    setProfileUpdateData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // Update User Profile
+  const handleProfileUpdate = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No authentication token found');
+
+      await axiosInstance.post('/update', profileUpdateData, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      alert('Profile updated successfully');
+      fetchUserProfile();
+      setShowProfileModal(false);
+    } catch (error) {
+      console.error('Profile update failed:', error);
+      alert('Failed to update profile');
+    }
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -82,31 +135,21 @@ const AppointmentPlacement = () => {
     }));
   };
 
-  // Validate form
   const validateForm = () => {
     const newErrors = {};
-
     if (!formData.Location) newErrors.Location = 'Location is required';
     if (!formData.Date) newErrors.Date = 'Date is required';
     if (!formData.Time) newErrors.Time = 'Time is required';
     if (!formData.description) newErrors.description = 'Description is required';
     if (!formData.doctor) newErrors.doctor = 'Doctor is required';
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // Submit appointment
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Reset previous submission error
     setSubmitError(null);
-
-    // Validate form
     if (!validateForm()) return;
-
-    // Start loading state
     setIsLoading(true);
 
     try {
@@ -115,18 +158,15 @@ const AppointmentPlacement = () => {
         throw new Error('No authentication token found');
       }
 
-      const response = await axiosInstance.post('/appointments', formData, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = isEditing
+        ? await axiosInstance.put(`/appointments/${selectedAppointment.id}`, formData, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          })
+        : await axiosInstance.post('/appointments', formData, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
 
-      // Handle successful submission
-      // Check for different possible response structures
-      const successMessage = response.data?.message || 
-                              'Appointment created successfully';
-
-      // Reset form
+      const successMessage = response.data?.message || 'Appointment saved successfully';
       setFormData({
         Location: '',
         Date: '',
@@ -135,61 +175,39 @@ const AppointmentPlacement = () => {
         doctor: '',
         userID: localStorage.getItem('userID') || ''
       });
-
-      // Refresh appointments list
       fetchAppointments();
-
-      // Optional: Show success message (you might want to use a toast or modal)
       alert(successMessage);
+      setIsEditing(false);
+      setSelectedAppointment(null);
+      setShowModal(false);
     } catch (error) {
-      console.error('Error creating appointment:', error);
-      
-      // Detailed error handling
+      console.error('Error saving appointment:', error);
       if (error.response) {
-        // The request was made and the server responded with a status code
-        // that falls out of the range of 2xx
-        setSubmitError(
-          error.response.data.message || 
-          error.response.data.errors?.join(', ') || 
-          'Failed to create appointment'
-        );
+        setSubmitError(error.response.data.message || 'Failed to save appointment');
       } else if (error.request) {
-        // The request was made but no response was received
         setSubmitError('No response received from server');
       } else {
-        // Something happened in setting up the request that triggered an Error
         setSubmitError('Error setting up the request');
       }
     } finally {
-      // Always stop loading, regardless of success or failure
       setIsLoading(false);
     }
   };
 
-  // Fetch single appointment details
-  const fetchAppointmentDetails = async (appointmentId) => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-
-      const response = await axiosInstance.get(`/appointments/${appointmentId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      // Log or handle appointment details
-      console.log('Appointment Details:', response.data);
-      alert(`Viewing details for appointment ${appointmentId}`);
-    } catch (error) {
-      console.error('Error fetching appointment details:', error);
-      alert('Failed to fetch appointment details');
-    }
+  const handleEdit = (appointment) => {
+    setFormData({
+      Location: appointment.Location,
+      Date: appointment.Date,
+      Time: appointment.Time,
+      description: appointment.description,
+      doctor: appointment.doctor,
+      userID: localStorage.getItem('userID') || ''
+    });
+    setIsEditing(true);
+    setSelectedAppointment(appointment);
+    setShowModal(true);
   };
 
-  // Delete appointment
   const handleDelete = async (appointmentId) => {
     try {
       const token = localStorage.getItem('token');
@@ -203,7 +221,6 @@ const AppointmentPlacement = () => {
         }
       });
 
-      // Refresh appointments after deletion
       fetchAppointments();
       alert('Appointment deleted successfully');
     } catch (error) {
@@ -212,145 +229,281 @@ const AppointmentPlacement = () => {
     }
   };
 
+  const handleAddAppointment = () => {
+    setFormData({
+      Location: '',
+      Date: '',
+      Time: '',
+      description: '',
+      doctor: '',
+      userID: localStorage.getItem('userID') || ''
+    });
+    setIsEditing(false);
+    setSelectedAppointment(null);
+    setShowModal(true);
+  };
+
   return (
-    <div className="container mx-auto p-4">
-      <h2 className="text-2xl font-bold mb-4">Create Appointment</h2>
-      
-      {/* Appointment Creation Form */}
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Display submission error if exists */}
-        {submitError && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-            <strong className="font-bold">Error: </strong>
-            <span className="block sm:inline">{submitError}</span>
-          </div>
-        )}
-
+    <div className="container my-5">
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <h2>Appointments</h2>
         <div>
-          <label className="block mb-2">Location</label>
-          <input
-            type="text"
-            name="Location"
-            value={formData.Location}
-            onChange={handleInputChange}
-            className={`w-full p-2 border rounded ${errors.Location ? 'border-red-500' : ''}`}
-          />
-          {errors.Location && <p className="text-red-500 text-sm mt-1">{errors.Location}</p>}
+          <button className="btn btn-secondary me-2" onClick={() => setShowProfileModal(true)}>
+            View Profile
+          </button>
+          <button className="btn btn-danger" onClick={handleLogout}>
+            Logout
+          </button>
         </div>
-
-        <div>
-          <label className="block mb-2">Date</label>
-          <input
-            type="date"
-            name="Date"
-            value={formData.Date}
-            onChange={handleInputChange}
-            className={`w-full p-2 border rounded ${errors.Date ? 'border-red-500' : ''}`}
-          />
-          {errors.Date && <p className="text-red-500 text-sm mt-1">{errors.Date}</p>}
-        </div>
-
-        <div>
-          <label className="block mb-2">Time</label>
-          <input
-            type="time"
-            name="Time"
-            value={formData.Time}
-            onChange={handleInputChange}
-            className={`w-full p-2 border rounded ${errors.Time ? 'border-red-500' : ''}`}
-          />
-          {errors.Time && <p className="text-red-500 text-sm mt-1">{errors.Time}</p>}
-        </div>
-
-        <div>
-          <label className="block mb-2">Doctor</label>
-          <input
-            type="text"
-            name="doctor"
-            value={formData.doctor}
-            onChange={handleInputChange}
-            className={`w-full p-2 border rounded ${errors.doctor ? 'border-red-500' : ''}`}
-          />
-          {errors.doctor && <p className="text-red-500 text-sm mt-1">{errors.doctor}</p>}
-        </div>
-
-        <div>
-          <label className="block mb-2">Description</label>
-          <textarea
-            name="description"
-            value={formData.description}
-            onChange={handleInputChange}
-            className={`w-full p-2 border rounded ${errors.description ? 'border-red-500' : ''}`}
-            rows={3}
-          />
-          {errors.description && <p className="text-red-500 text-sm mt-1">{errors.description}</p>}
-        </div>
-
-        <button 
-          type="submit" 
-          disabled={isLoading}
-          className={`w-full p-2 rounded ${
-            isLoading 
-              ? 'bg-gray-400 cursor-not-allowed' 
-              : 'bg-blue-500 text-white hover:bg-blue-600'
-          }`}
-        >
-          {isLoading ? 'Creating...' : 'Create Appointment'}
-        </button>
-      </form>
-
-      {/* Appointments List */}
-      <div className="mt-8">
-        <h3 className="text-xl font-bold mb-4">Your Appointments</h3>
-        
-        {/* Error handling for fetching appointments */}
-        {fetchError && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-            <strong className="font-bold">Error: </strong>
-            <span className="block sm:inline">{fetchError}</span>
-          </div>
-        )}
-
-        {/* Loading state */}
-        {isLoading ? (
-          <p className="text-center">Loading appointments...</p>
-        ) : appointments.length === 0 ? (
-          <p>No appointments found</p>
-        ) : (
-          <div className="space-y-4">
-            {appointments.map((appointment) => (
-              <div 
-                key={appointment.id || Math.random()} 
-                className="border p-4 rounded flex justify-between items-center"
-              >
-                <div>
-                  <p><strong>Location:</strong> {appointment.Location || 'N/A'}</p>
-                  <p><strong>Date:</strong> {appointment.Date || 'N/A'}</p>
-                  <p><strong>Time:</strong> {appointment.Time || 'N/A'}</p>
-                  <p><strong>Doctor:</strong> {appointment.doctor || 'N/A'}</p>
-                  <p><strong>Description:</strong> {appointment.description || 'N/A'}</p>
-                </div>
-                <div className="flex space-x-2">
-                  <button 
-                    onClick={() => fetchAppointmentDetails(appointment.id)}
-                    className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
-                  >
-                    View Details
-                  </button>
-                  <button 
-                    onClick={() => handleDelete(appointment.id)}
-                    className="bg-red-500 text-white p-2 rounded hover:bg-red-600"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
+      
+
+      <button className="btn btn-primary mb-4" onClick={handleAddAppointment}>
+        Add Appointment
+      </button>
+
+      <h3>Your Appointments</h3>
+      {fetchError && (
+        <div className="alert alert-danger" role="alert">
+          {fetchError}
+        </div>
+      )}
+
+      {isLoading ? (
+        <p>Loading appointments...</p>
+      ) : appointments.length === 0 ? (
+        <p>No appointments found</p>
+      ) : (
+        <div className="list-group">
+          {appointments.map((appointment) => (
+            <div key={appointment.id || Math.random()} className="list-group-item d-flex justify-content-between align-items-center">
+              <div>
+                <p><strong>Location:</strong> {appointment.Location || 'N/A'}</p>
+                <p><strong>Date:</strong> {appointment.Date || 'N/A'}</p>
+                <p><strong>Time:</strong> {appointment.Time || 'N/A'}</p>
+                <p><strong>Doctor:</strong> {appointment.doctor || 'N/A'}</p>
+                <p><strong>Description:</strong> {appointment.description || 'N/A'}</p>
+              </div>
+              <div>
+                <button
+                  onClick={() => handleEdit(appointment)}
+                  className="btn btn-warning me-2"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => handleDelete(appointment.id)}
+                  className="btn btn-danger"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Modal */}
+      <div className={`modal fade ${showModal ? 'show' : ''}`} style={{ display: showModal ? 'block' : 'none' }} tabIndex="-1" role="dialog">
+        <div className="modal-dialog" role="document">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h5 className="modal-title">{isEditing ? 'Edit Appointment' : 'Add Appointment'}</h5>
+              <button type="button" className="btn-close float-end" onClick={() => setShowModal(false)} aria-label="Close">
+                
+              </button>
+            </div>
+            <div className="modal-body">
+              <form onSubmit={handleSubmit}>
+                {submitError && (
+                  <div className="alert alert-danger" role="alert">
+                    {submitError}
+                  </div>
+                )}
+
+                <div className="mb-3">
+                  <label className="form-label">Location</label>
+                  <input
+                    type="text"
+                    name="Location"
+                    value={formData.Location}
+                    onChange={handleInputChange}
+                    className={`form-control ${errors.Location ? 'is-invalid' : ''}`}
+                  />
+                  {errors.Location && <div className="invalid-feedback">{errors.Location}</div>}
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label">Date</label>
+                  <input
+                    type="date"
+                    name="Date"
+                    value={formData.Date}
+                    onChange={handleInputChange}
+                    className={`form-control ${errors.Date ? 'is-invalid' : ''}`}
+                  />
+                  {errors.Date && <div className="invalid-feedback">{errors.Date}</div>}
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label">Time</label>
+                  <input
+                    type="time"
+                    name="Time"
+                    value={formData.Time}
+                    onChange={handleInputChange}
+                    className={`form-control ${errors.Time ? 'is-invalid' : ''}`}
+                  />
+                  {errors.Time && <div className="invalid-feedback">{errors.Time}</div>}
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label">Doctor</label>
+                  <input
+                    type="text"
+                    name="doctor"
+                    value={formData.doctor}
+                    onChange={handleInputChange}
+                    className={`form-control ${errors.doctor ? 'is-invalid' : ''}`}
+                  />
+                  {errors.doctor && <div className="invalid-feedback">{errors.doctor}</div>}
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label">Description</label>
+                  <textarea
+                    name="description"
+                    value={formData.description}
+                    onChange={handleInputChange}
+                    className={`form-control ${errors.description ? 'is-invalid' : ''}`}
+                    rows="3"
+                  ></textarea>
+                  {errors.description && <div className="invalid-feedback">{errors.description}</div>}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className={`btn ${isLoading ? 'btn-secondary' : 'btn-primary'}`}
+                >
+                  {isLoading ? 'Saving...' : isEditing ? 'Update Appointment' : 'Create Appointment'}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Profile Modal */}
+      <div 
+        className={`modal fade ${showProfileModal ? 'show' : ''}`} 
+        style={{ display: showProfileModal ? 'block' : 'none' }} 
+        tabIndex="-1" 
+        role="dialog"
+      >
+        <div className="modal-dialog" role="document">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h5 className="modal-title">User Profile</h5>
+              <button 
+                type="button" 
+                className="btn-close" 
+                onClick={() => setShowProfileModal(false)} 
+                aria-label="Close"
+              />
+            </div>
+            <div className="modal-body">
+              {profileError && (
+                <div className="alert alert-danger" role="alert">
+                  {profileError}
+                </div>
+              )}
+
+              <form onSubmit={(e) => { e.preventDefault(); handleProfileUpdate(); }}>
+                <div className="mb-3">
+                  <label className="form-label">Name</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    name="name"
+                    value={profileUpdateData.name || ''}
+                    onChange={handleProfileInputChange}
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label">Email</label>
+                  <input
+                    type="email"
+                    className="form-control"
+                    name="email"
+                    value={profileUpdateData.email || ''}
+                    onChange={handleProfileInputChange}
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label">Current Password</label>
+                  <input
+                    type="password"
+                    className="form-control"
+                    name="current_password"
+                    onChange={handleProfileInputChange}
+                  />
+                </div>
+
+                <div className="mb-3">
+                  <label className="form-label">New Password</label>
+                  <input
+                    type="password"
+                    className="form-control"
+                    name="new_password"
+                    onChange={handleProfileInputChange}
+                  />
+                  <small className="text-muted">
+                    Leave password fields empty if you don't want to change it
+                  </small>
+                </div>
+
+                <div className="d-flex justify-content-between">
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                  >
+                    Update Profile
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setShowProfileModal(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Modal Backdrop */}
+      {(showModal || showProfileModal) && (
+        <div 
+          className="modal-backdrop fade show" 
+          onClick={() => {
+            setShowModal(false);
+            setShowProfileModal(false);
+          }}
+        ></div>
+      )}
+   
     </div>
+
+  
+    
+    
   );
+
 };
 
 export default AppointmentPlacement;
