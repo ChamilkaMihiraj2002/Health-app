@@ -9,11 +9,13 @@ use App\Http\Controllers\Api\AuthController;
 
 Route::post("/login", [AuthController::class,"login"]);
 Route::post("/register", [AuthController::class,"register"]);
+Route::post("/update", [AuthController::class,"update"]);
 
 
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::post("/logout", [AuthController::class,"logout"]);
     Route::get("/profile", [AuthController::class,"profile"]);
+    Route::post("/update", [AuthController::class,"update"]);
     Route::apiResource('appointments', AppointmentController::class);
     Route::apiResource('doctors', DoctorsController::class);
 });
