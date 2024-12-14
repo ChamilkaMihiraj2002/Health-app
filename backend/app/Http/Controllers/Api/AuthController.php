@@ -92,4 +92,51 @@ class AuthController extends Controller
             ],404);            
         }
     }
+
+    public function update(Request $request): JsonResponse
+    {
+        // Validate the request
+        $request->validate([
+            'name' => 'sometimes|string|max:255',
+            'email' => 'sometimes|email|max:255|unique:users,email,' . $request->user()->id,
+            'current_password' => 'required_with:new_password|string',
+            'new_password' => 'sometimes|string|min:8|max:255'
+        ]);
+
+        try {
+            $user = User::findOrFail($request->user()->id);
+
+            if ($request->has('new_password')) {
+                if (!Hash::check($request->current_password, $user->password)) {
+                    return response()->json([
+                        'message' => 'Current password is incorrect'
+                    ], 401);
+                }
+                $user->password = Hash::make($request->new_password);
+            }
+
+            // Update other fields if provided
+            if ($request->has('name')) {
+                $user->name = $request->name;
+            }
+            
+            if ($request->has('email')) {
+                $user->email = $request->email;
+            }
+
+            $user->save();
+
+            return response()->json([
+                'message' => 'Profile updated successfully',
+                'data' => $user
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Failed to update profile',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+    
 }
