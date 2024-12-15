@@ -139,4 +139,49 @@ class AuthController extends Controller
         }
     }
     
+    public function showAllUsers(): JsonResponse
+    {
+        try {
+            $users = User::all();
+
+            if ($users->isEmpty()) {
+                return response()->json([
+                    'message' => 'No users found'
+                ], 404);
+            }
+
+            return response()->json([
+                'message' => 'Users fetched successfully',
+                'data' => $users
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Failed to fetch users',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function deleteUser(Request $request, $id): JsonResponse
+    {
+        try {
+            $user = User::findOrFail($id);
+
+            $user->tokens()->delete();
+
+            $user->delete();
+
+            return response()->json([
+                'message' => 'User deleted successfully'
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Failed to delete user',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
 }
