@@ -35,7 +35,7 @@ class DoctorsController extends Controller
             ],402);
         }
 
-        $appointment = Doctors::create([
+        $doctor = Doctors::create([
             'name'=> $request->name,
             'hospital'=> $request->hospital,
             'specialty'=> $request->specialty,
@@ -43,15 +43,15 @@ class DoctorsController extends Controller
 
         return response() -> json([
             'message'=> 'Doctor created successfully',
-            'data' => new DoctorsResource($appointment),
+            'data' => new DoctorsResource($doctor),
         ], 200);
     }
 
-    public function show(Doctors $appointment) {
-        return new DoctorsResource($appointment);
+    public function show(Doctors $doctor) {
+        return new DoctorsResource($doctor);
     }
 
-    public function update(Request $request, Doctors $appointment) {
+    public function update(Request $request, Doctors $doctor) {
         $validator = Validator::make($request->all(), [
             'name'=> 'required|string|max:255',
             'hospital'=> 'required|string|max:255',
@@ -65,7 +65,7 @@ class DoctorsController extends Controller
             ],402);
         }
 
-        $appointment->update([
+        $doctor->update([
             'name'=> $request->name,
             'hospital'=> $request->hospital,
             'specialty'=> $request->specialty,
@@ -73,12 +73,12 @@ class DoctorsController extends Controller
 
         return response() -> json([
             'message'=> 'doctor updated successfully',
-            'data'=> new DoctorsResource($appointment)
+            'data'=> new DoctorsResource($doctor)
         ],200);
     }
 
-    public function destroy(Doctors $appointment) {
-        $appointment->delete();
+    public function destroy(Doctors $doctor) {
+        $doctor->delete();
         return response() -> json([
             'message'=> 'doctor deleted successfully',
         ],200);

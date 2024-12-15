@@ -57,6 +57,20 @@ class AppointmentController extends Controller
         return new AppointmentResource($appointment);
     }
 
+    public function getAppointmentsByUserID($userID) {
+        $appointments = Appointment::where('userID', $userID)->get();
+        
+        if ($appointments->count() > 0) {
+            return AppointmentResource::collection($appointments);
+        } else {
+            return response()->json([
+                'message' => 'No appointments found for this user',
+            ], 404);
+        }
+    }
+
+
+
     public function update(Request $request, Appointment $appointment) {
         $validator = Validator::make($request->all(), [
             'Location'=> 'required|string|max:255',

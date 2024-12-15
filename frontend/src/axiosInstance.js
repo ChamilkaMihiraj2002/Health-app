@@ -6,7 +6,7 @@ const apiRoutes = {
   fetchAppointments: { method: 'get', url: '/appointments' },
   fetchUsers: { method: 'get', url: '/admin/users' },
   updateUser: { method: 'put', url: '/admin/users/:id' },
-  deleteUser: { method: 'delete', url: '/admin/users/:id' },
+  delete: { method: 'delete', url: '/admin/users/:id' },
 };
 
 const axiosInstance = axios.create({
