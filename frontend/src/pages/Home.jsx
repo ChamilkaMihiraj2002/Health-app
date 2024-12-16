@@ -1,6 +1,6 @@
 import React from 'react';
 import Navbar from '../components/Navbar';
-import heroImage from '../assets/hero-image.png'; // Replace with your image path
+import heroImage from '../assets/hero-image.jpg'; // Replace with your image path
 import featuresImage from '../assets/features-image.png'; // Replace with your image path
 
 const Home = () => {
