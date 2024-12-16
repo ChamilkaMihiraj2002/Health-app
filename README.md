@@ -119,7 +119,7 @@ php artisan key:generate
 4. Setup database
 ```bash
 php artisan migrate
-php artisan db:seed
+php artisan db:hospital_DB
 ```
 
 5. Run backend server
