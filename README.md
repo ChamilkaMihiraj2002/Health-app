@@ -78,7 +78,8 @@ medical-appointment-app/
 ### Prerequisites
 - Node.js (v15+)
 - npm or yarn
-- PHP (v11.0+)
+- PHP (v8.0+)
+- Laravel (v11.0+)
 - Composer
 - MySQL
 
