@@ -60,7 +60,7 @@ const AppointmentPlacement = () => {
       const appointmentsData = response.data?.data || response.data?.appointments || [];
       setAppointments(Array.isArray(appointmentsData) ? appointmentsData : []);
     } catch (error) {
-      addNotification('Failed to fetch appointments', 'danger');
+      console.log(error);
     } finally {
       setIsLoading(false);
     }
@@ -105,7 +105,6 @@ const AppointmentPlacement = () => {
       [name]: value
     }));
 
-    loadUserData();
   };
 
   const handleProfileUpdate = async () => {
@@ -119,6 +118,7 @@ const AppointmentPlacement = () => {
       addNotification('Profile updated successfully', 'success');
       fetchUserProfile();
       setShowProfileModal(false);
+
     } catch (error) {
       addNotification('Failed to update profile', 'danger');
     }
