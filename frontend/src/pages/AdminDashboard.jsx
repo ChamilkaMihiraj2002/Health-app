@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { axiosInstance } from '../axiosInstance';
+import 'bootstrap-icons/font/bootstrap-icons.css';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   
-  // Initialize state with more robust typing
   const [users, setUsers] = useState({
     data: [],
     loading: false,
@@ -25,16 +25,13 @@ const AdminDashboard = () => {
     error: null
   });
 
-  // Utility function to safely get data
   const safelyGetData = (response, key) => {
-    // Check multiple possible data structures
     if (Array.isArray(response.data)) return response.data;
     if (response.data && Array.isArray(response.data[key])) return response.data[key];
     if (response.data && Array.isArray(response.data.data)) return response.data.data;
     return [];
   };
 
-  // Create authorized axios instance
   const createAuthorizedRequest = () => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -48,9 +45,7 @@ const AdminDashboard = () => {
     });
   };
 
-  // Fetch Users
   const fetchUsers = async () => {
-    // Reset users state before fetching
     setUsers(prev => ({ ...prev, loading: true, error: null }));
     
     try {
@@ -60,7 +55,6 @@ const AdminDashboard = () => {
       const response = await api.get('/users');
       const userData = safelyGetData(response, 'users');
 
-      // Validate user data structure
       const validatedUsers = userData.filter(user => 
         user && typeof user === 'object' && 
         user.id && 
@@ -81,16 +75,13 @@ const AdminDashboard = () => {
         error: err.response?.data?.message || 'Failed to fetch users'
       });
 
-      // Handle unauthorized access
       if (err.response && err.response.status === 401) {
         handleLogout();
       }
     }
   };
 
-  // Fetch Doctors
   const fetchDoctors = async () => {
-    // Reset doctors state before fetching
     setDoctors(prev => ({ ...prev, loading: true, error: null }));
     
     try {
@@ -100,7 +91,6 @@ const AdminDashboard = () => {
       const response = await api.get('/doctors');
       const doctorData = safelyGetData(response, 'doctors');
 
-      // Validate doctor data structure
       const validatedDoctors = doctorData.filter(doctor => 
         doctor && typeof doctor === 'object' && 
         doctor.id && 
@@ -121,38 +111,56 @@ const AdminDashboard = () => {
         error: err.response?.data?.message || 'Failed to fetch doctors'
       });
 
-      // Handle unauthorized access
       if (err.response && err.response.status === 401) {
         handleLogout();
       }
     }
   };
 
-  // Fetch Appointments
   const fetchAppointments = async () => {
-    // Reset appointments state before fetching
     setAppointments(prev => ({ ...prev, loading: true, error: null }));
     
     try {
-      const api = createAuthorizedRequest();
-      if (!api) return;
-
-      const response = await api.get('/appointments');
-      const appointmentData = safelyGetData(response, 'appointments');
-
-      // Validate appointment data structure
+      const token = localStorage.getItem('token');
+      if (!token) {
+        handleLogout();
+        return;
+      }
+  
+      const response = await axiosInstance.get('/appointments', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+  
+      const appointmentData = response.data?.data || [];
+  
       const validatedAppointments = appointmentData.filter(appointment => 
-        appointment && typeof appointment === 'object' && 
+        appointment && 
+        typeof appointment === 'object' && 
         appointment.id && 
-        appointment.date && 
-        appointment.time
-      );
-
+        appointment.Date && 
+        appointment.Time && 
+        appointment.Location && 
+        appointment.doctor
+      ).map(appointment => ({
+        id: appointment.id,
+        date: appointment.Date,
+        time: appointment.Time,
+        location: appointment.Location,
+        doctor: appointment.doctor,
+        description: appointment.description,
+        userId: appointment.userID,
+        createdAt: appointment.created_at
+      }));
+  
       setAppointments({
         data: validatedAppointments,
         loading: false,
         error: validatedAppointments.length === 0 ? 'No appointments found' : null
       });
+  
     } catch (err) {
       console.error('Appointments fetch error:', err);
       setAppointments({
@@ -160,15 +168,13 @@ const AdminDashboard = () => {
         loading: false,
         error: err.response?.data?.message || 'Failed to fetch appointments'
       });
-
-      // Handle unauthorized access
-      if (err.response && err.response.status === 401) {
+  
+      if (err.response?.status === 401) {
         handleLogout();
       }
     }
   };
 
-  // Fetch all data on component mount
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -181,14 +187,22 @@ const AdminDashboard = () => {
     fetchAppointments();
   }, []);
 
-  // Logout Handler
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('userID');
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No authentication token found');
+    
+      await axiosInstance.post('/logout', {}, {
+          headers: { 'Authorization': `Bearer ${token}` }
+      });
+      localStorage.removeItem('token');
+      localStorage.removeItem('userID');
+      setTimeout(() => window.location.reload(), 1000);
+      } catch (error) {
+        console.error('Logout error:', error);
+      }
   };
 
-  // Delete User
   const deleteUser = async (id) => {
     try {
       const api = createAuthorizedRequest();
@@ -207,7 +221,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // Delete Doctor
   const deleteDoctor = async (id) => {
     try {
       const api = createAuthorizedRequest();
@@ -226,7 +239,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // Delete Appointment
   const deleteAppointment = async (id) => {
     try {
       const api = createAuthorizedRequest();
@@ -245,15 +257,12 @@ const AdminDashboard = () => {
     }
   };
 
-  // Dashboard Statistics
   const stats = [
     { title: 'Total Users', value: users.data.length, icon: 'bi-people' },
     { title: 'Total Doctors', value: doctors.data.length, icon: 'bi-hospital' },
     { title: 'Total Appointments', value: appointments.data.length, icon: 'bi-calendar-check' },
-    { title: 'Total Revenue', value: '$12,345', icon: 'bi-currency-dollar' },
   ];
 
-  // Render Users Table
   const renderUsersTable = () => {
     if (users.loading) return <div className="text-center">Loading users...</div>;
     if (users.error) return <div className="alert alert-warning">{users.error}</div>;
@@ -280,7 +289,6 @@ const AdminDashboard = () => {
                   >
                     Delete
                   </button>
-                  
                 </td>
               </tr>
             ))}
@@ -290,7 +298,6 @@ const AdminDashboard = () => {
     );
   };
 
-  // Render Doctors Table
   const renderDoctorsTable = () => {
     if (doctors.loading) return <div className="text-center">Loading doctors...</div>;
     if (doctors.error) return <div className="alert alert-warning">{doctors.error}</div>;
@@ -328,7 +335,6 @@ const AdminDashboard = () => {
     );
   };
 
-  // Render Appointments Table
   const renderAppointmentsTable = () => {
     if (appointments.loading) return <div className="text-center">Loading appointments...</div>;
     if (appointments.error) return <div className="alert alert-warning">{appointments.error}</div>;
@@ -372,7 +378,6 @@ const AdminDashboard = () => {
 
   return (
     <div className="admin-dashboard bg-light min-vh-100">
-      {/* Navigation Bar */}
       <nav className="navbar navbar-expand-lg navbar-dark bg-primary">
         <div className="container-fluid">
           <a className="navbar-brand" href="#">Admin Dashboard</a>
@@ -387,7 +392,6 @@ const AdminDashboard = () => {
 
       <div className="container-fluid">
         <div className="row">
-          {/* Sidebar */}
           <div className="col-md-3 col-lg-2 bg-white sidebar">
             <div className="position-sticky pt-3">
               <ul className="nav flex-column">
@@ -411,9 +415,7 @@ const AdminDashboard = () => {
             </div>
           </div>
 
-          {/* Main Content */}
           <main className="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
-            {/* Overview Tab */}
             {activeTab === 'overview' && (
               <div className="row">
                 {stats.map((stat, index) => (
@@ -434,7 +436,6 @@ const AdminDashboard = () => {
               </div>
             )}
 
-            {/* Users Tab */}
             {activeTab === 'users' && (
               <div className="card">
                 <div className="card-header">Users Management</div>
@@ -444,7 +445,6 @@ const AdminDashboard = () => {
               </div>
             )}
 
-            {/* Doctors Tab */}
             {activeTab === 'doctors' && (
               <div className="card">
                 <div className="card-header">Doctors Management</div>
@@ -454,7 +454,6 @@ const AdminDashboard = () => {
               </div>
             )}
 
-            {/* Appointments Tab */}
             {activeTab === 'appointments' && (
               <div className="card">
                 <div className="card-header">Appointments Management</div>
