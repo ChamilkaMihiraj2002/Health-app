@@ -44,12 +44,12 @@ This web application is a comprehensive medical appointment booking system desig
 - React Bootstrap
 - Axios for API communication
 - React Router for navigation
-- RESTful API
 
 ### Backend
 - Laravel
 - MySQL Database
 - Laravel Sanctum for authentication
+- RESTful API
 
 ## Project Structure
 
@@ -148,6 +148,8 @@ php artisan serve
 - `POST /api/appointments` - Create a new appointment
 - `PUT /api/appointments/{id}` - Update appointment
 - `DELETE /api/appointments/{id}` - Cancel appointment
+
+![Screenshot 2024-12-17 001110](https://github.com/user-attachments/assets/18a484ac-de70-45b4-962f-34cfb2f99d79)
 
 ## Environment Variables
 Create `.env` files for both frontend and backend with the necessary configurations:
