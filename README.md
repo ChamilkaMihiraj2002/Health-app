@@ -2,7 +2,7 @@
 
 ## Academic Module
 **Course Code:** IN22-S3-IN2120 - Web Programming  
-**Semester:** Spring 2024
+**Semester:** L2S1
 
 ## Project Overview
 This web application is a comprehensive medical appointment booking system designed to streamline the process of scheduling medical consultations. The platform provides an intuitive interface for patients to browse doctors, view their specialties, and book appointments seamlessly.
