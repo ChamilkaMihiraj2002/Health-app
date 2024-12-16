@@ -180,7 +180,7 @@ DB_PASSWORD=
 Distributed under the MIT License. See `LICENSE` for more information.
 
 ## Contact
-Your Name - your.email@example.com
+Chamilka Mihiraj Perera - chamilkaperera5@gmail.com
 
 Project Link: [https://github.com/ChamilkaMihiraj2002/Health-app](https://github.com/ChamilkaMihiraj2002/Health-app)
 
