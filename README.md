@@ -133,19 +133,24 @@ php artisan serve
 - `POST /api/register` - User Registration
 - `POST /api/login` - User Login
 - `POST /api/logout` - User Logout
+- `GET /api/profile` - Get User Profile
+-  `POST /api/update` - Update User Details
+-  `DELETE /api/users/{id}` - Delete User
 
 ### Doctors
 - `GET /api/doctors` - List all doctors
 - `GET /api/doctors/{id}` - Get specific doctor details
+- `DELETE /api/doctors/{id}` - Delete specific doctor
 
 ### Appointments
 - `GET /api/appointments` - List user's appointments
-- `POST /api/appointments` - Create new appointment
+- `GET /api/appointments/{id}` - Get specific user's appointments
+- `POST /api/appointments` - Create a new appointment
 - `PUT /api/appointments/{id}` - Update appointment
 - `DELETE /api/appointments/{id}` - Cancel appointment
 
 ## Environment Variables
-Create `.env` files for both frontend and backend with necessary configurations:
+Create `.env` files for both frontend and backend with the necessary configurations:
 
 ### Frontend `.env`
 ```
@@ -165,7 +170,7 @@ DB_PASSWORD=
 
 ## Authentication Flow
 1. User registers or logs in
-2. Backend generates authentication token
+2. Backend generates an authentication token
 3. Token stored in frontend for subsequent API requests
 4. Protected routes require valid authentication
 
