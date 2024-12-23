@@ -13,6 +13,8 @@ const Login = () => {
     setIsLoading(true);
 
     try {
+
+      // Perform regular login API request
       const response = await axiosInstance({
         method: apiRoutes.login.method,
         url: apiRoutes.login.url,
@@ -22,7 +24,13 @@ const Login = () => {
       // Store token and user ID in local storage
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('userID', response.data.user_id); // Adjust key if necessary
-      window.location.href = '/appointments'; // Redirect to the appointments page
+
+      if (email === 'Admin@abc.com' && password === 'admin@123') {
+        window.location.href = '/admin';
+      } else {
+        window.location.href = '/appointments';
+      }
+      
     } catch (error) {
       setError(error.response?.data?.message || 'Login failed. Please try again.');
     } finally {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { axiosInstance } from '../axiosInstance'; // Adjust the import path as needed
+import { axiosInstance } from '../axiosInstance';
+import UserDetails from "../components/UserDetails";
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 const AppointmentPlacement = () => {
@@ -15,8 +16,7 @@ const AppointmentPlacement = () => {
   const [appointments, setAppointments] = useState([]);
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [submitError, setSubmitError] = useState(null);
-  const [fetchError, setFetchError] = useState(null);
+  const [notifications, setNotifications] = useState([]);
   const [isEditing, setIsEditing] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -25,15 +25,25 @@ const AppointmentPlacement = () => {
   const [profileData, setProfileData] = useState({});
   const [profileUpdateData, setProfileUpdateData] = useState({});
   const [profileError, setProfileError] = useState(null);
+  const { userData, loading } = UserDetails();
+  let name, email;
 
   useEffect(() => {
     fetchAppointments();
     fetchUserProfile();
   }, []);
 
+  const loadUserData = async () => {
+    if (!loading) {
+      name = userData.name;
+      email = userData.email;
+    }
+  };
+
+  loadUserData();
   const fetchAppointments = async () => {
     setIsLoading(true);
-    setFetchError(null);
+    const userID = localStorage.getItem('userID');
 
     try {
       const token = localStorage.getItem('token');
@@ -41,32 +51,22 @@ const AppointmentPlacement = () => {
         throw new Error('No authentication token found');
       }
 
-      const response = await axiosInstance.get('/appointments', {
+      const response = await axiosInstance.get(`/appointments/user/${userID}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
 
-      const appointmentsData = response.data?.data || response.data?.appointments || response.data || [];
+      const appointmentsData = response.data?.data || response.data?.appointments || [];
       setAppointments(Array.isArray(appointmentsData) ? appointmentsData : []);
     } catch (error) {
-      console.error('Error fetching appointments:', error);
-      if (error.response) {
-        setFetchError(error.response.data.message || 'Failed to fetch appointments');
-      } else if (error.request) {
-        setFetchError('No response received from server');
-      } else {
-        setFetchError('Error setting up the request');
-      }
-      setAppointments([]);
+      console.log(error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Fetch User Profile
   const fetchUserProfile = async () => {
-    setProfileError(null);
     try {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No authentication token found');
@@ -81,7 +81,6 @@ const AppointmentPlacement = () => {
     }
   };
 
-  // Handle Logout
   const handleLogout = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -92,24 +91,22 @@ const AppointmentPlacement = () => {
       });
       localStorage.removeItem('token');
       localStorage.removeItem('userID');
-      alert('Logged out successfully!');
-      window.location.reload(); // Refresh or redirect to login
+      addNotification('Logged out successfully!', 'success');
+      setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
-      console.error('Logout failed:', error);
-      alert('Failed to logout');
+      addNotification('Failed to logout', 'danger');
     }
   };
 
-  // Handle Profile Update Input Change
   const handleProfileInputChange = (e) => {
     const { name, value } = e.target;
     setProfileUpdateData(prev => ({
       ...prev,
       [name]: value
     }));
+
   };
 
-  // Update User Profile
   const handleProfileUpdate = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -118,12 +115,34 @@ const AppointmentPlacement = () => {
       await axiosInstance.post('/update', profileUpdateData, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      alert('Profile updated successfully');
+      addNotification('Profile updated successfully', 'success');
       fetchUserProfile();
       setShowProfileModal(false);
+
     } catch (error) {
-      console.error('Profile update failed:', error);
-      alert('Failed to update profile');
+      addNotification('Failed to update profile', 'danger');
+    }
+  };
+
+  const handleDeleteProfile = async () => {
+    const userId = localStorage.getItem('userID');
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No authentication token found');
+
+      await axiosInstance.delete(`/users/${userId}`, { headers: { 'Authorization': `Bearer ${token}` } });
+      localStorage.removeItem('token');
+      localStorage.removeItem('userID');
+      addNotification('Account deleted successfully!', 'success');
+      setTimeout(() => window.location.reload(), 1000);
+    } catch (error) {
+      addNotification('Profile delete failed', 'danger');
+    }
+  };
+
+  const deleteProfile = () => {
+    if (window.confirm('Are you sure you want to delete your account?')) {
+      handleDeleteProfile();
     }
   };
 
@@ -148,15 +167,12 @@ const AppointmentPlacement = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitError(null);
     if (!validateForm()) return;
     setIsLoading(true);
 
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
+      if (!token) throw new Error('No authentication token found');
 
       const response = isEditing
         ? await axiosInstance.put(`/appointments/${selectedAppointment.id}`, formData, {
@@ -167,42 +183,20 @@ const AppointmentPlacement = () => {
           });
 
       const successMessage = response.data?.message || 'Appointment saved successfully';
-      setFormData({
-        Location: '',
-        Date: '',
-        Time: '',
-        description: '',
-        doctor: '',
-        userID: localStorage.getItem('userID') || ''
-      });
+      setFormData({ Location: '', Date: '', Time: '', description: '', doctor: '', userID: localStorage.getItem('userID') || '' });
       fetchAppointments();
-      alert(successMessage);
-      setIsEditing(false);
-      setSelectedAppointment(null);
+      addNotification(successMessage, 'success');
       setShowModal(false);
+      setIsEditing(false);
     } catch (error) {
-      console.error('Error saving appointment:', error);
-      if (error.response) {
-        setSubmitError(error.response.data.message || 'Failed to save appointment');
-      } else if (error.request) {
-        setSubmitError('No response received from server');
-      } else {
-        setSubmitError('Error setting up the request');
-      }
+      addNotification('Failed to save appointment', 'danger');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleEdit = (appointment) => {
-    setFormData({
-      Location: appointment.Location,
-      Date: appointment.Date,
-      Time: appointment.Time,
-      description: appointment.description,
-      doctor: appointment.doctor,
-      userID: localStorage.getItem('userID') || ''
-    });
+    setFormData({ ...appointment, userID: localStorage.getItem('userID') || '' });
     setIsEditing(true);
     setSelectedAppointment(appointment);
     setShowModal(true);
@@ -211,9 +205,7 @@ const AppointmentPlacement = () => {
   const handleDelete = async (appointmentId) => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
+      if (!token) throw new Error('No authentication token found');
 
       await axiosInstance.delete(`/appointments/${appointmentId}`, {
         headers: {
@@ -222,25 +214,23 @@ const AppointmentPlacement = () => {
       });
 
       fetchAppointments();
-      alert('Appointment deleted successfully');
+      addNotification('Appointment deleted successfully', 'success');
     } catch (error) {
-      console.error('Error deleting appointment:', error);
-      alert('Failed to delete appointment');
+      addNotification('Failed to delete appointment', 'danger');
     }
   };
 
   const handleAddAppointment = () => {
-    setFormData({
-      Location: '',
-      Date: '',
-      Time: '',
-      description: '',
-      doctor: '',
-      userID: localStorage.getItem('userID') || ''
-    });
+    setFormData({ Location: '', Date: '', Time: '', description: '', doctor: '', userID: localStorage.getItem('userID') || '' });
     setIsEditing(false);
     setSelectedAppointment(null);
     setShowModal(true);
+  };
+
+  const addNotification = (message, type) => {
+    const id = Date.now();
+    setNotifications(prev => [...prev, { id, message, type }]);
+    setTimeout(() => setNotifications(prev => prev.filter(notification => notification.id !== id)), 3000);
   };
 
   return (
@@ -256,27 +246,31 @@ const AppointmentPlacement = () => {
           </button>
         </div>
       </div>
-      
+
+      {notifications.map(({ id, message, type }) => (
+        <div key={id} className={`toast show align-items-center text-bg-${type} border-0 mb-2`} role="alert" aria-live="assertive" aria-atomic="true">
+          <div className="d-flex">
+            <div className="toast-body">
+              {message}
+            </div>
+            <button type="button" className="btn-close btn-close-white me-2 m-auto" onClick={() => setNotifications(prev => prev.filter(n => n.id !== id))} aria-label="Close"></button>
+          </div>
+        </div>
+      ))}
 
       <button className="btn btn-primary mb-4" onClick={handleAddAppointment}>
         Add Appointment
       </button>
 
       <h3>Your Appointments</h3>
-      {fetchError && (
-        <div className="alert alert-danger" role="alert">
-          {fetchError}
-        </div>
-      )}
-
       {isLoading ? (
         <p>Loading appointments...</p>
       ) : appointments.length === 0 ? (
-        <p>No appointments found</p>
+        <p>No appointments found.</p>
       ) : (
         <div className="list-group">
           {appointments.map((appointment) => (
-            <div key={appointment.id || Math.random()} className="list-group-item d-flex justify-content-between align-items-center">
+            <div key={appointment.id} className="list-group-item d-flex justify-content-between align-items-center">
               <div>
                 <p><strong>Location:</strong> {appointment.Location || 'N/A'}</p>
                 <p><strong>Date:</strong> {appointment.Date || 'N/A'}</p>
@@ -285,16 +279,10 @@ const AppointmentPlacement = () => {
                 <p><strong>Description:</strong> {appointment.description || 'N/A'}</p>
               </div>
               <div>
-                <button
-                  onClick={() => handleEdit(appointment)}
-                  className="btn btn-warning me-2"
-                >
+                <button className="btn btn-warning me-2" onClick={() => handleEdit(appointment)}>
                   Edit
                 </button>
-                <button
-                  onClick={() => handleDelete(appointment.id)}
-                  className="btn btn-danger"
-                >
+                <button className="btn btn-danger" onClick={() => handleDelete(appointment.id)}>
                   Delete
                 </button>
               </div>
@@ -303,96 +291,78 @@ const AppointmentPlacement = () => {
         </div>
       )}
 
-      {/* Modal */}
-      <div className={`modal fade ${showModal ? 'show' : ''}`} style={{ display: showModal ? 'block' : 'none' }} tabIndex="-1" role="dialog">
-        <div className="modal-dialog" role="document">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h5 className="modal-title">{isEditing ? 'Edit Appointment' : 'Add Appointment'}</h5>
-              <button type="button" className="btn-close float-end" onClick={() => setShowModal(false)} aria-label="Close">
-                
-              </button>
-            </div>
-            <div className="modal-body">
-              <form onSubmit={handleSubmit}>
-                {submitError && (
-                  <div className="alert alert-danger" role="alert">
-                    {submitError}
+      {/* Modal for adding/editing appointments */}
+      {showModal && (
+        <div className="modal show d-block" tabIndex="-1" role="dialog">
+          <div className="modal-dialog" role="document">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">{isEditing ? 'Edit Appointment' : 'Add Appointment'}</h5>
+                <button type="button" className="btn-close" onClick={() => setShowModal(false)}></button>
+              </div>
+              <div className="modal-body">
+                <form onSubmit={handleSubmit}>
+                  <div className="mb-3">
+                    <label className="form-label">Location</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      name="Location"
+                      value={formData.Location}
+                      onChange={handleInputChange}
+                    />
+                    {errors.Location && <small className="text-danger">{errors.Location}</small>}
                   </div>
-                )}
-
-                <div className="mb-3">
-                  <label className="form-label">Location</label>
-                  <input
-                    type="text"
-                    name="Location"
-                    value={formData.Location}
-                    onChange={handleInputChange}
-                    className={`form-control ${errors.Location ? 'is-invalid' : ''}`}
-                  />
-                  {errors.Location && <div className="invalid-feedback">{errors.Location}</div>}
-                </div>
-
-                <div className="mb-3">
-                  <label className="form-label">Date</label>
-                  <input
-                    type="date"
-                    name="Date"
-                    value={formData.Date}
-                    onChange={handleInputChange}
-                    className={`form-control ${errors.Date ? 'is-invalid' : ''}`}
-                  />
-                  {errors.Date && <div className="invalid-feedback">{errors.Date}</div>}
-                </div>
-
-                <div className="mb-3">
-                  <label className="form-label">Time</label>
-                  <input
-                    type="time"
-                    name="Time"
-                    value={formData.Time}
-                    onChange={handleInputChange}
-                    className={`form-control ${errors.Time ? 'is-invalid' : ''}`}
-                  />
-                  {errors.Time && <div className="invalid-feedback">{errors.Time}</div>}
-                </div>
-
-                <div className="mb-3">
-                  <label className="form-label">Doctor</label>
-                  <input
-                    type="text"
-                    name="doctor"
-                    value={formData.doctor}
-                    onChange={handleInputChange}
-                    className={`form-control ${errors.doctor ? 'is-invalid' : ''}`}
-                  />
-                  {errors.doctor && <div className="invalid-feedback">{errors.doctor}</div>}
-                </div>
-
-                <div className="mb-3">
-                  <label className="form-label">Description</label>
-                  <textarea
-                    name="description"
-                    value={formData.description}
-                    onChange={handleInputChange}
-                    className={`form-control ${errors.description ? 'is-invalid' : ''}`}
-                    rows="3"
-                  ></textarea>
-                  {errors.description && <div className="invalid-feedback">{errors.description}</div>}
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className={`btn ${isLoading ? 'btn-secondary' : 'btn-primary'}`}
-                >
-                  {isLoading ? 'Saving...' : isEditing ? 'Update Appointment' : 'Create Appointment'}
-                </button>
-              </form>
+                  <div className="mb-3">
+                    <label className="form-label">Date</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      name="Date"
+                      value={formData.Date}
+                      onChange={handleInputChange}
+                    />
+                    {errors.Date && <small className="text-danger">{errors.Date}</small>}
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">Time</label>
+                    <input
+                      type="time"
+                      className="form-control"
+                      name="Time"
+                      value={formData.Time}
+                      onChange={handleInputChange}
+                    />
+                    {errors.Time && <small className="text-danger">{errors.Time}</small>}
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">Doctor</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      name="doctor"
+                      value={formData.doctor}
+                      onChange={handleInputChange}
+                    />
+                    {errors.doctor && <small className="text-danger">{errors.doctor}</small>}
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label">Description</label>
+                    <textarea
+                      className="form-control"
+                      name="description"
+                      value={formData.description}
+                      onChange={handleInputChange}
+                    />
+                    {errors.description && <small className="text-danger">{errors.description}</small>}
+                  </div>
+                  <button type="submit" className="btn btn-primary">Save</button>
+                </form>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Profile Modal */}
       <div 
@@ -421,23 +391,23 @@ const AppointmentPlacement = () => {
 
               <form onSubmit={(e) => { e.preventDefault(); handleProfileUpdate(); }}>
                 <div className="mb-3">
-                  <label className="form-label">Name</label>
+                  <label className="form-label">Name </label>
                   <input
                     type="text"
                     className="form-control"
                     name="name"
-                    value={profileUpdateData.name || ''}
+                    value={profileUpdateData.name || name || ''}
                     onChange={handleProfileInputChange}
                   />
                 </div>
 
                 <div className="mb-3">
-                  <label className="form-label">Email</label>
+                  <label className="form-label">Email </label>
                   <input
                     type="email"
                     className="form-control"
                     name="email"
-                    value={profileUpdateData.email || ''}
+                    value={profileUpdateData.email || email || ''}
                     onChange={handleProfileInputChange}
                   />
                 </div>
@@ -474,10 +444,10 @@ const AppointmentPlacement = () => {
                   </button>
                   <button
                     type="button"
-                    className="btn btn-secondary"
-                    onClick={() => setShowProfileModal(false)}
+                    onClick={() => deleteProfile()}
+                    className="btn btn-danger"
                   >
-                    Cancel
+                    Delete Account
                   </button>
                 </div>
               </form>
@@ -485,25 +455,8 @@ const AppointmentPlacement = () => {
           </div>
         </div>
       </div>
-
-      {/* Modal Backdrop */}
-      {(showModal || showProfileModal) && (
-        <div 
-          className="modal-backdrop fade show" 
-          onClick={() => {
-            setShowModal(false);
-            setShowProfileModal(false);
-          }}
-        ></div>
-      )}
-   
     </div>
-
-  
-    
-    
   );
-
 };
 
 export default AppointmentPlacement;
